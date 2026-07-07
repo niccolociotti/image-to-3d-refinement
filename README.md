@@ -147,7 +147,7 @@ Le dipendenze principali sono elencate in `requirements.txt`.
 
 ## Installazione
 
-Il progetto lo avvio dentro un container Docker già predisposto.
+Il progetto si avvia dentro un container Docker già predisposto.
 
 Da host:
 
@@ -168,56 +168,20 @@ Se il container è già configurato con CUDA, non serve creare un virtualenv loc
 
 ## File e cartelle necessari
 
-Assicurati che esistano o siano configurati correttamente:
+Devono esistere o essere configurati correttamente:
 
 - `/app/Progetto-CG/checkpoints/sam2.1_hiera_base_plus.pt`
 - la copia locale di ComfyUI montata nel container
-- la copia locale di TRELLIS.2, se vuoi usare la generazione 3D
+- la copia locale di TRELLIS.2, per la generazione 3D
 - una cartella `/app/Progetto-CG/models/trellis_cache/` per la cache Hugging Face/TRELLIS
-
-## Configurazione
-
-Le variabili d’ambiente più utili sono:
-
-- `PORT`: porta del server Flask, default `8081`
-- `FLASK_DEBUG`: `1` per debug
-- `SERVER_AUTO_SHUTDOWN_SECONDS`: spegne il server dopo N secondi, se impostato
-- `HF_TOKEN` o `HUGGINGFACE_HUB_TOKEN`: token Hugging Face, utile per modelli gated
-- `Z_IMAGE_CHECKPOINT`: checkpoint usato da image generation e inpaint
-- `Z_IMAGE_CLIP`
-- `Z_IMAGE_VAE`
-- `SAM2_PATH`: path alla copia locale di SAM2
-- `SAM2_CHECKPOINT`: path diretto al checkpoint SAM2
-- `SAM2_CHECKPOINT_DIR`: directory dove cercare checkpoint SAM2
-- `SAM2_MODEL_CFG`: config YAML di SAM2
-- `SAM2_DEVICE`: `auto`, `cuda`, `cpu`, ecc.
-- `TRELLIS2_PATH`: path alla copia locale di TRELLIS.2
-- `TRELLIS2_MODEL_ID`: modello Hugging Face da usare per 3D
-- `TRELLIS2_DEVICE`: default `cuda`
-- `TRELLIS2_CACHE_DIR`: cache locale per i pesi
-- `TRELLIS2_LOCAL_SNAPSHOT`: snapshot locale da preferire
-- `TRELLIS2_MAX_NUM_TOKENS`
-- `TRELLIS2_DECIMATION_TARGET`
-- `TRELLIS2_TEXTURE_SIZE`
-- `TRELLIS2_SIMPLIFY_LIMIT`
-- `TRELLIS2_REMESH`
-- `TRELLIS2_EXTENSION_WEBP`
-
-Puoi mettere queste variabili in un file `.env` nella root del progetto.
 
 ## Avvio
 
-Avvia il server dentro il container, dalla root del progetto:
+Si avvia il server dentro il container, dalla root del progetto:
 
 ```bash
 cd /app/Progetto-CG
 python3 app.py
-```
-
-Oppure con le variabili d’ambiente già definite:
-
-```bash
-PORT=8081 FLASK_DEBUG=1 python3 app.py
 ```
 
 Il server ascolta su `0.0.0.0`
