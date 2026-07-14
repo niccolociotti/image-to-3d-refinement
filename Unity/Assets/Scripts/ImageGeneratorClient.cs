@@ -21,12 +21,13 @@ public class ImageGeneratorClient : MonoBehaviour
     public RawImage maskOverlayImage;
 
     [Header("UI Elements - 3D")]
-    public Button generate3DButton; 
+    public Button generate3DButton;
 
     [Header("Visualizzazione Modello 3D")]
     [Min(0.01f)] public float modelSize = 0.35f;
     [Min(0f)] public float modelGapFromImage = 0.12f;
     public float modelDepthOffset = 0.15f;
+    public bool rotateGeneratedModel180AroundY = true;
 
     [Header("Impostazioni Server")]
     public string serverUrlImage = "http://192.168.80.138:8081/generate-image";
@@ -37,6 +38,7 @@ public class ImageGeneratorClient : MonoBehaviour
 
     [Header("Maschera SAM2")]
     public bool useSam2Masking = true;
+    public bool sam2AddToExistingMask = true;
     public string sam2SelectionMode = "part";
     [Min(0)] public int sam2GrowMaskBy = 0;
     [Min(0f)] public float sam2MaskBlur = 0f;
@@ -80,6 +82,8 @@ public class ImageGeneratorClient : MonoBehaviour
 
     void Start()
     {
+        ConfigurePromptInputField();
+
         // Imposta i listener per i bottoni
         generateImageButton.onClick.AddListener(OnGenerateImageClicked);
         
@@ -101,6 +105,34 @@ public class ImageGeneratorClient : MonoBehaviour
             maskPainter.PointSelected += OnMaskPointSelected;
             maskPainter.brushEnabled = !useSam2Masking;
         }
+    }
+
+    void ConfigurePromptInputField()
+    {
+        if (promptInput == null)
+        {
+            return;
+        }
+
+        promptInput.lineType = TMP_InputField.LineType.MultiLineNewline;
+        promptInput.scrollSensitivity = 10f;
+
+        ConfigurePromptText(promptInput.textComponent);
+        ConfigurePromptText(promptInput.placeholder as TMP_Text);
+        promptInput.ForceLabelUpdate();
+    }
+
+    void ConfigurePromptText(TMP_Text text)
+    {
+        if (text == null)
+        {
+            return;
+        }
+
+        text.textWrappingMode = TextWrappingModes.Normal;
+        text.overflowMode = TextOverflowModes.ScrollRect;
+        text.alignment = TextAlignmentOptions.TopLeft;
+        text.margin = new Vector4(0f, 0f, 0f, 0f);
     }
 
     void OnResetMaskClicked()
@@ -255,8 +287,16 @@ public class ImageGeneratorClient : MonoBehaviour
             yield break;
         }
 
-        maskPainter.SetMaskFromPng(segmentResult.maskPng);
-        Debug.Log($"Maschera SAM2 pronta. Score={segmentResult.score:0.000}, index={segmentResult.selectedMaskIndex}");
+        if (sam2AddToExistingMask)
+        {
+            maskPainter.AddMaskFromPng(segmentResult.maskPng);
+        }
+        else
+        {
+            maskPainter.SetMaskFromPng(segmentResult.maskPng);
+        }
+
+        Debug.Log($"Maschera SAM2 pronta. Score={segmentResult.score:0.000}, index={segmentResult.selectedMaskIndex}, add={sam2AddToExistingMask}");
         RestoreGenerate3DButton();
     }
     #endregion
@@ -428,6 +468,7 @@ public class ImageGeneratorClient : MonoBehaviour
         if (currentModelContainer != null)
         {
             Destroy(currentModelContainer);
+            currentModelContainer = null;
         }
 
         // Crea un contenitore indipendente dal Canvas.
@@ -447,6 +488,8 @@ public class ImageGeneratorClient : MonoBehaviour
             
             if (instantiateSuccess)
             {
+                ApplyGeneratedModelRotation(modelContainer);
+
                 if (!NormalizeAndPositionModel(modelContainer))
                 {
                     Debug.LogWarning("Modello caricato, ma non sono stati trovati Renderer per calcolarne scala e posizione.");
@@ -458,12 +501,22 @@ public class ImageGeneratorClient : MonoBehaviour
             {
                 Debug.LogError("Il file .glb è stato caricato, ma c'è stato un errore durante la sua generazione nella scena.");
                 Destroy(modelContainer);
+                currentModelContainer = null;
             }
         }
         else
         {
             Debug.LogError("Impossibile caricare il file .glb. Il file potrebbe essere corrotto o invalido.");
             Destroy(modelContainer); // Pulisce la scena eliminando il contenitore vuoto
+            currentModelContainer = null;
+        }
+    }
+
+    void ApplyGeneratedModelRotation(GameObject modelContainer)
+    {
+        if (rotateGeneratedModel180AroundY && modelContainer != null)
+        {
+            modelContainer.transform.Rotate(Vector3.up, 180f, Space.World);
         }
     }
 

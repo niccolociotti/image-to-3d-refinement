@@ -76,6 +76,16 @@ public class ImageMaskPainter : MonoBehaviour, IPointerDownHandler, IDragHandler
 
     public void SetMaskFromPng(byte[] maskPng)
     {
+        ApplyMaskFromPng(maskPng, false);
+    }
+
+    public void AddMaskFromPng(byte[] maskPng)
+    {
+        ApplyMaskFromPng(maskPng, true);
+    }
+
+    void ApplyMaskFromPng(byte[] maskPng, bool addToExistingMask)
+    {
         if (maskPng == null || maskPng.Length == 0)
         {
             return;
@@ -88,14 +98,23 @@ public class ImageMaskPainter : MonoBehaviour, IPointerDownHandler, IDragHandler
             return;
         }
 
-        DestroyTextures();
+        bool canReuseTextures = addToExistingMask
+            && maskTexture != null
+            && overlayTexture != null
+            && maskTexture.width == sourceTexture.width
+            && maskTexture.height == sourceTexture.height;
 
-        maskTexture = new Texture2D(sourceTexture.width, sourceTexture.height, TextureFormat.RGBA32, false);
-        overlayTexture = new Texture2D(sourceTexture.width, sourceTexture.height, TextureFormat.RGBA32, false);
+        if (!canReuseTextures)
+        {
+            DestroyTextures();
+
+            maskTexture = new Texture2D(sourceTexture.width, sourceTexture.height, TextureFormat.RGBA32, false);
+            overlayTexture = new Texture2D(sourceTexture.width, sourceTexture.height, TextureFormat.RGBA32, false);
+        }
 
         Color32[] sourcePixels = sourceTexture.GetPixels32();
-        Color32[] maskPixels = new Color32[sourcePixels.Length];
-        Color32[] overlayPixels = new Color32[sourcePixels.Length];
+        Color32[] maskPixels = canReuseTextures ? maskTexture.GetPixels32() : new Color32[sourcePixels.Length];
+        Color32[] overlayPixels = canReuseTextures ? overlayTexture.GetPixels32() : new Color32[sourcePixels.Length];
         Color32 black = new Color32(0, 0, 0, 255);
         Color32 white = new Color32(255, 255, 255, 255);
         Color32 transparent = new Color32(0, 0, 0, 0);
@@ -105,6 +124,12 @@ public class ImageMaskPainter : MonoBehaviour, IPointerDownHandler, IDragHandler
         {
             Color32 pixel = sourcePixels[i];
             bool selected = pixel.r > 127 || pixel.g > 127 || pixel.b > 127;
+
+            if (addToExistingMask && !selected)
+            {
+                selected = maskPixels[i].r > 127 || maskPixels[i].g > 127 || maskPixels[i].b > 127;
+            }
+
             maskPixels[i] = selected ? white : black;
             overlayPixels[i] = selected ? overlayPaintColor : transparent;
             anySelected |= selected;
