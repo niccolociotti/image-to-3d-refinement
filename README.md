@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/hero-result.png" alt="Confronto tra modello 3D generato prima e dopo l'inpainting" width="1100">
+  <img src="docs/images/comparison.png" alt="Confronto tra modello 3D generato prima e dopo l'inpainting" width="8000">
 </p>
 
 > Progetto accademico sviluppato per il corso di **Computer Graphics e Multimedia** dell'Università Politecnica delle Marche, A.A. 2025-2026.
@@ -29,11 +29,9 @@
 - [Utilizzo](#utilizzo)
 - [API REST](#api-rest)
 - [Output](#output)
-- [Risoluzione dei problemi](#risoluzione-dei-problemi)
 - [Limitazioni note](#limitazioni-note)
 - [Sviluppi futuri](#sviluppi-futuri)
 - [Relazione e autori](#relazione-e-autori)
-- [Licenze](#licenze)
 
 ## Panoramica
 
@@ -64,7 +62,7 @@ Il progetto è predisposto per OpenXR e XR Interaction Toolkit, ma durante lo sv
 ## Workflow
 
 <p align="center">
-  <img src="docs/images/workflow.png" alt="Workflow della pipeline Image-to-3D" width="900">
+  <img src="docs/images/worklflow.png" alt="Workflow della pipeline Image-to-3D" width="900">
 </p>
 
 Il flusso principale è:
@@ -84,7 +82,7 @@ Prompt
 Esempio di selezione automatica tramite SAM2:
 
 <p align="center">
-  <img src="docs/images/sam2-mask.png" alt="Esempio di segmentazione automatica con SAM2" width="420">
+  <img src="docs/images/macchina.png" alt="Esempio di segmentazione automatica con SAM2" width="420">
 </p>
 
 
@@ -477,13 +475,13 @@ Il progetto include strumenti per testare l'applicazione nell'Editor:
 Con il backend attivo e la scena Unity in Play Mode, nel campo di testo si può inserire un prompt come:
 
 ```text
-a red ceramic mug with a curved handle
+a red cup, with red handle
 ```
 
 Il pulsante **Generate Image** invia il prompt al backend e mostra il risultato nella `RawImage`. Usando poi **Generate 3D** senza una maschera, Unity scarica il file `.glb` e lo mostra accanto all'immagine.
 
 <p align="center">
-  <img src="docs/images/result-original.png" alt="Modello 3D generato direttamente dall'immagine originale" width="850">
+  <img src="docs/images/3d.png" alt="Modello 3D generato direttamente dall'immagine originale" width="850">
 </p>
 
 ### Generazione dopo inpainting
@@ -491,13 +489,13 @@ Il pulsante **Generate Image** invia il prompt al backend e mostra il risultato 
 Dopo la prima generazione, la regione da modificare può essere selezionata a mano oppure con un click quando SAM2 è attivo. Il campo del prompt viene poi riutilizzato per descrivere la modifica, per esempio:
 
 ```text
-replace the handle with a blue handle
+blue handle
 ```
 
 Con **Generate 3D**, il client passa prima da `/edit-image` e poi da `/generate-3d`. Alla fine, nella scena compaiono sia l'immagine modificata sia il modello 3D risultante.
 
 <p align="center">
-  <img src="docs/images/result-inpainted.png" alt="Modello 3D generato dopo l'inpainting" width="850">
+  <img src="docs/images/3d2.png" alt="Modello 3D generato dopo l'inpainting" width="850">
 </p>
 
 ## API REST
@@ -532,7 +530,7 @@ curl -X POST http://127.0.0.1:8081/generate-image \
   -H "Content-Type: application/json" \
   -d '{
     "session_id": "demo",
-    "prompt": "a red ceramic mug with a curved handle",
+    "prompt": "a red cup, with red handle",
     "negative_prompt": "blurry, ugly, bad, background",
     "width": 1024,
     "height": 1024,
@@ -593,7 +591,7 @@ curl -X POST http://127.0.0.1:8081/edit-image \
     "session_id": "demo",
     "image_path": "/absolute/path/to/Server/runs/demo/generated_123.png",
     "mask_path": "/absolute/path/to/Server/runs/demo/mask.png",
-    "prompt": "replace the handle with a blue handle",
+    "prompt": "blue handle",
     "steps": 30,
     "cfg": 8.0,
     "denoise": 0.8,
