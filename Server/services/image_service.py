@@ -1,18 +1,13 @@
-import base64
 import os
 import random
-import time
-from contextlib import ExitStack
 from pathlib import Path
 
 import numpy as np
-import requests
 import torch
 from PIL import Image
 
 from services.comfyui_bootstrap import (
     add_comfyui_to_path,
-    block_optional_imports,
     comfyui_not_found_message,
     patch_torch_for_comfyui,
 )
@@ -20,13 +15,24 @@ from services.comfyui_bootstrap import (
 add_comfyui_to_path()
 patch_torch_for_comfyui(torch)
 
-REMOTE_IMAGE_WORKER_URL = os.getenv("REMOTE_IMAGE_WORKER_URL", "").rstrip("/")
 IMAGE_PROMPT_SUFFIX = "product render, no background"
 
+# ComfyUI nodes — disponibili solo se ComfyUI è nel PYTHONPATH o in COMFYUI_PATH
+try:
+    from nodes import NODE_CLASS_MAPPINGS
 
-def remote_image_worker_url():
-    return os.getenv("REMOTE_IMAGE_WORKER_URL", "").rstrip("/")
-
+    UNETLoader = NODE_CLASS_MAPPINGS["UNETLoader"]()
+    CLIPLoader = NODE_CLASS_MAPPINGS["CLIPLoader"]()
+    VAELoader = NODE_CLASS_MAPPINGS["VAELoader"]()
+    CLIPTextEncode = NODE_CLASS_MAPPINGS["CLIPTextEncode"]()
+    EmptyLatentImage = NODE_CLASS_MAPPINGS["EmptyLatentImage"]()
+    KSampler = NODE_CLASS_MAPPINGS["KSampler"]()
+    VAEDecode = NODE_CLASS_MAPPINGS["VAEDecode"]()
+    COMFYUI_AVAILABLE = True
+    COMFYUI_IMPORT_ERROR = None
+except Exception as exc:
+    COMFYUI_AVAILABLE = False
+    COMFYUI_IMPORT_ERROR = exc
 
 def apply_image_prompt_suffix(prompt: str) -> str:
     prompt = prompt.strip()
@@ -37,31 +43,6 @@ def apply_image_prompt_suffix(prompt: str) -> str:
     return f"{prompt}{separator}{IMAGE_PROMPT_SUFFIX}"
 
 
-if REMOTE_IMAGE_WORKER_URL:
-    COMFYUI_AVAILABLE = False
-    COMFYUI_IMPORT_ERROR = None
-else:
-    # ComfyUI nodes — disponibili solo se ComfyUI è nel PYTHONPATH o in COMFYUI_PATH
-    try:
-        with ExitStack() as stack:
-            if os.getenv("DISABLE_COMFY_KITCHEN") == "1":
-                stack.enter_context(block_optional_imports("comfy_kitchen"))
-            from nodes import NODE_CLASS_MAPPINGS
-
-        UNETLoader = NODE_CLASS_MAPPINGS["UNETLoader"]()
-        CLIPLoader = NODE_CLASS_MAPPINGS["CLIPLoader"]()
-        VAELoader = NODE_CLASS_MAPPINGS["VAELoader"]()
-        CLIPTextEncode = NODE_CLASS_MAPPINGS["CLIPTextEncode"]()
-        EmptyLatentImage = NODE_CLASS_MAPPINGS["EmptyLatentImage"]()
-        KSampler = NODE_CLASS_MAPPINGS["KSampler"]()
-        VAEDecode = NODE_CLASS_MAPPINGS["VAEDecode"]()
-        COMFYUI_AVAILABLE = True
-        COMFYUI_IMPORT_ERROR = None
-    except Exception as exc:
-        COMFYUI_AVAILABLE = False
-        COMFYUI_IMPORT_ERROR = exc
-
-
 class ImageGenerationService:
     def __init__(self):
         self.unet = None
@@ -70,12 +51,6 @@ class ImageGenerationService:
         self.models_loaded = False
 
     def load_models(self, checkpoint=None):
-        worker_url = remote_image_worker_url()
-        if worker_url:
-            self.models_loaded = True
-            print(f"[ImageGenerationService] Uso worker remoto: {worker_url}")
-            return
-
         if not COMFYUI_AVAILABLE:
             detail = f" Dettaglio: {COMFYUI_IMPORT_ERROR}" if COMFYUI_IMPORT_ERROR else ""
             raise RuntimeError(f"{comfyui_not_found_message()}{detail}")
@@ -94,105 +69,6 @@ class ImageGenerationService:
         if not self.models_loaded:
             self.load_models()
 
-    def _generate_remote(
-        self,
-        prompt,
-        negative_prompt,
-        width,
-        height,
-        steps,
-        cfg,
-        seed,
-        denoise,
-        output_dir,
-    ):
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
-        worker_url = remote_image_worker_url()
-        if not worker_url:
-            raise RuntimeError("REMOTE_IMAGE_WORKER_URL non impostato per la generazione remota.")
-
-        started_at = time.time()
-        request_payload = {
-            "prompt": prompt,
-            "negative_prompt": negative_prompt,
-            "width": width,
-            "height": height,
-            "steps": steps,
-            "cfg": cfg,
-            "seed": seed,
-            "denoise": denoise,
-        }
-        print(
-            "[ImageGenerationService] Invio job al worker remoto "
-            f"{worker_url}/jobs/generate-image "
-            f"size={width}x{height} steps={steps} seed={seed}",
-            flush=True,
-        )
-        response = requests.post(
-            f"{worker_url}/jobs/generate-image",
-            json=request_payload,
-            timeout=30,
-        )
-        response.raise_for_status()
-        payload = response.json()
-        job_id = payload.get("job_id")
-        if not job_id:
-            raise RuntimeError(payload.get("error", "Il worker remoto non ha restituito job_id."))
-
-        timeout = int(os.getenv("REMOTE_IMAGE_TIMEOUT", "900"))
-        poll_interval = float(os.getenv("REMOTE_IMAGE_POLL_INTERVAL", "5"))
-        deadline = time.time() + timeout
-        last_status_log = 0
-        while time.time() < deadline:
-            try:
-                status_response = requests.get(
-                    f"{worker_url}/jobs/{job_id}",
-                    timeout=30,
-                )
-                status_response.raise_for_status()
-            except requests.RequestException as exc:
-                elapsed = time.time() - started_at
-                print(
-                    f"[ImageGenerationService] Poll job remoto {job_id} fallito "
-                    f"elapsed={elapsed:.1f}s: {exc}. Riprovo...",
-                    flush=True,
-                )
-                time.sleep(poll_interval)
-                continue
-            payload = status_response.json()
-            status = payload.get("status")
-            elapsed = time.time() - started_at
-            if elapsed - last_status_log >= 15:
-                print(
-                    f"[ImageGenerationService] Job remoto {job_id} status={status} elapsed={elapsed:.1f}s",
-                    flush=True,
-                )
-                last_status_log = elapsed
-            if status == "done":
-                break
-            if status == "error":
-                raise RuntimeError(payload.get("error", "Job remoto fallito."))
-            time.sleep(poll_interval)
-        else:
-            raise TimeoutError(f"Timeout job remoto {job_id} dopo {timeout}s")
-
-        print(
-            f"[ImageGenerationService] Risposta worker ricevuta dopo {time.time() - started_at:.1f}s",
-            flush=True,
-        )
-        if payload.get("status") != "done" or not payload.get("image_base64"):
-            raise RuntimeError(payload.get("error", "Risposta non valida dal worker remoto."))
-
-        if seed == 0:
-            seed = payload.get("seed", "remote")
-        out_path = os.path.join(output_dir, f"generated_{seed}.png")
-        image_data = payload["image_base64"]
-        if "," in image_data:
-            image_data = image_data.split(",", 1)[1]
-        Path(out_path).write_bytes(base64.b64decode(image_data))
-        print(f"[ImageGenerationService] Immagine remota salvata: {out_path}", flush=True)
-        return out_path
-
     @torch.inference_mode()
     def generate(
         self,
@@ -209,20 +85,6 @@ class ImageGenerationService:
         self._ensure_loaded()
         prompt = apply_image_prompt_suffix(prompt)
         print(f"[ImageGenerationService] Prompt finale usato: {prompt!r}", flush=True)
-
-        if remote_image_worker_url():
-            return self._generate_remote(
-                prompt,
-                negative_prompt,
-                width,
-                height,
-                steps,
-                cfg,
-                seed,
-                denoise,
-                output_dir,
-            )
-
         Path(output_dir).mkdir(parents=True, exist_ok=True)
 
         if seed == 0:

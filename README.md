@@ -662,12 +662,6 @@ La rotta `/files/<path>` rende accessibili al client i file salvati sotto `Serve
 - Dockerfile e `docker-compose.yml` riproducibili.
 - Supporto a nuove pipeline Image-to-3D.
 
-## Relazione e autori
-
-La relazione completa è disponibile in:
-
-[`docs/Graphics.pdf`](docs/Graphics.pdf)
-
 ### Autori
 
 - **Niccolò Ciotti**

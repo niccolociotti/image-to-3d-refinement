@@ -67,15 +67,15 @@ class Model3DGenerationService:
         self.model_loaded = False
         self.model_id = os.getenv("TRELLIS2_MODEL_ID", "microsoft/TRELLIS.2-4B")
         self.device = os.getenv("TRELLIS2_DEVICE", "cuda")
-        self.pipeline_type = os.getenv("TRELLIS2_PIPELINE_TYPE", "512")
-        self.max_num_tokens = _env_int("TRELLIS2_MAX_NUM_TOKENS", 32_768)
-        self.decimation_target = _env_int("TRELLIS2_DECIMATION_TARGET", 250_000)
-        self.texture_size = _env_int("TRELLIS2_TEXTURE_SIZE", 1024)
+        self.pipeline_type = os.getenv("TRELLIS2_PIPELINE_TYPE", "1024")
+        self.max_num_tokens = _env_int("TRELLIS2_MAX_NUM_TOKENS", 65536)
+        self.decimation_target = _env_int("TRELLIS2_DECIMATION_TARGET", 750000)
+        self.texture_size = _env_int("TRELLIS2_TEXTURE_SIZE", 2048)
         self.simplify_limit = _env_int(
             "TRELLIS2_SIMPLIFY_LIMIT",
-            _env_int("TRELLIS2_RESHAPE_SIMPLIFY_LIMIT", 4_000_000),
+            _env_int("TRELLIS2_RESHAPE_SIMPLIFY_LIMIT", 8000000),
         )
-        self.remesh = _env_bool("TRELLIS2_REMESH", False)
+        self.remesh = _env_bool("TRELLIS2_REMESH", 1)
         self.extension_webp = _env_bool("TRELLIS2_EXTENSION_WEBP", False)
         self.trellis2_path = self._find_trellis2_path()
 
@@ -385,7 +385,7 @@ class Model3DGenerationService:
                 self._torch.cuda.empty_cache()
             if self._is_cuda_oom(exc):
                 raise RuntimeError(
-                    "CUDA out of memory durante la generazione 3D con il profilo leggero 512. "
+                    "CUDA out of memory durante la generazione 3D con il profilo leggero. "
                     "Libera VRAM o riduci il carico della GPU e riprova."
                 ) from exc
             raise
